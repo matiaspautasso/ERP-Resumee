@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Test / coverage
+coverage/
+test-results/
+playwright-report/
+.playwright/
+
+# Env
+.env
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local agent/skill tooling (not part of the project)
+.agents/
+skills-lock.json
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
