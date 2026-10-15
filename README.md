@@ -7,6 +7,22 @@ model, a full testing pyramid, and a professional CI pipeline.
 > Portfolio project. It is **not** hosted — the pipeline builds and tests everything and produces a
 > runnable Docker image, but there is no deployment target by design.
 
+## Screenshots
+
+**Products dashboard** — live stock on hand, derived from the append-only ledger, with prices
+formatted from integer minor units by the shared `Money` value object:
+
+![Products dashboard](docs/screenshots/02-dashboard.png)
+
+**OpenAPI / Swagger** — every endpoint grouped by bounded context, with a lock on the
+permission-guarded routes:
+
+![Swagger UI](docs/screenshots/03-swagger.png)
+
+**Sign in** — stateless JWT authentication, passwords hashed with Argon2id:
+
+![Sign in](docs/screenshots/01-login.png)
+
 ## Stack
 
 | Layer    | Technology                                                                     |
@@ -41,6 +57,19 @@ A single NestJS application split into bounded-context modules (`inventory`, `pu
 Two deliberate choices worth calling out: stock is an **append-only ledger** (`QuantityOnHand` is a
 sum, giving a full audit trail), and money is stored as **integer minor units** (never floats).
 
+### How a sale is confirmed
+
+Confirming a sales order is the flow that ties the system together, and it shows the enterprise
+concerns working in one request:
+
+1. The `PermissionsGuard` checks the caller holds `sales_order:confirm` (evaluated by the pure `AccessPolicy`); otherwise **403**.
+2. Inside a single database transaction (`TransactionRunner`), the order is validated as a confirmable draft, and the `StockLedger` writes one outbound movement per line.
+3. If any line would drive stock below zero, the ledger throws, the **whole transaction rolls back**, and the client gets **409** — no partial order, no phantom stock movement.
+4. On success the order flips to `confirmed` and the stock movements commit atomically with it.
+
+This single path exercises authorization, business rules, and ACID transactions together — and it
+is covered end-to-end by the integration tests.
+
 ## Repository layout
 
 ```
@@ -53,28 +82,41 @@ docs/             ADRs and the design document
 .github/          CI, CodeQL, Dependabot
 ```
 
-## Getting started
+## Running it locally
 
-Prerequisites: Node 24+, pnpm 10+, Docker.
+Prerequisites: **Node 24+**, **pnpm 10+**, **Docker**.
 
 ```bash
 pnpm install
-
-# Run the full stack (Postgres + API) in Docker
-docker compose up --build        # API on http://localhost:3000, Swagger at /docs
-pnpm --filter @erp/api seed       # load roles and demo users
-
-# Or run the frontend against it
-pnpm --filter @erp/web dev        # http://localhost:5173
 ```
 
-### Seeded users
+### 1. Start the backend (API + PostgreSQL)
 
-| Email                 | Password        | Role                    |
-| --------------------- | --------------- | ----------------------- |
-| `admin@erp.local`     | `Admin123!`     | admin (all permissions) |
-| `warehouse@erp.local` | `Warehouse123!` | warehouse_operator      |
-| `sales@erp.local`     | `Sales123!`     | sales_clerk             |
+```bash
+docker compose up --build       # builds the API image and starts it with Postgres
+pnpm --filter @erp/api seed      # load roles and demo users
+```
+
+- API: <http://localhost:3000>
+- Interactive API docs (Swagger): <http://localhost:3000/docs>
+- Health check: <http://localhost:3000/health>
+
+> Ports 3000 or 5432 already taken? Override them:
+> `API_HOST_PORT=3100 DB_HOST_PORT=5433 docker compose up --build`.
+
+### 2. Start the frontend
+
+```bash
+pnpm --filter @erp/web dev       # http://localhost:5173, proxies /api to the backend
+```
+
+Then sign in with a seeded account:
+
+| Email                 | Password        | Role                                       |
+| --------------------- | --------------- | ------------------------------------------ |
+| `admin@erp.local`     | `Admin123!`     | admin — every permission                   |
+| `warehouse@erp.local` | `Warehouse123!` | warehouse_operator — products & purchasing |
+| `sales@erp.local`     | `Sales123!`     | sales_clerk — customers & sales            |
 
 ## Testing
 
