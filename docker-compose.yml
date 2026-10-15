@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: erp
+      POSTGRES_PASSWORD: erp
+      POSTGRES_DB: erp
+    ports:
+      - '${DB_HOST_PORT:-5432}:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U erp']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      NODE_ENV: production
+      # Self-contained demo stack: let the app create its schema on boot.
+      # A real production deployment would set this false and run migrations.
+      DB_SYNCHRONIZE: 'true'
+      API_PORT: 3000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: erp
+      DB_PASSWORD: erp
+      DB_NAME: erp
+      JWT_SECRET: ${JWT_SECRET:-local-dev-secret}
+    ports:
+      - '${API_HOST_PORT:-3000}:3000'
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db-data:
