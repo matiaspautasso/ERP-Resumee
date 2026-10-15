@@ -1,6 +1,6 @@
 # Multi-stage build for the NestJS API. Build context is the repo root so the pnpm
 # workspace (including @erp/shared) is available.
-FROM node:24-bookworm-slim AS builder
+FROM node:25-bookworm-slim AS builder
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable
@@ -19,7 +19,7 @@ RUN pnpm --filter @erp/shared build \
   && pnpm --filter @erp/api build \
   && pnpm --filter @erp/api deploy --prod --legacy /app
 
-FROM node:24-bookworm-slim AS runner
+FROM node:25-bookworm-slim AS runner
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=builder /app/dist ./dist
